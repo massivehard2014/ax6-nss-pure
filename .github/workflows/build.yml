@@ -62,8 +62,32 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
           make defconfig
-          echo "===== 核对关键配置（缺行则说明配置未生效）====="
-          grep -E 'CONFIG_TARGET_DEVICE_qualcommax_ipq807x_DEVICE_redmi_ax6|CONFIG_PACKAGE_nss-firmware-ipq8074|CONFIG_PACKAGE_ath11k-firmware-ipq8074|CONFIG_PACKAGE_kmod-qca-nss-drv-eogremgr' .config
+          echo "===== 校验关键配置（任一缺失立即失败，避免白跑）====="
+          MISSING=0
+          check() {
+            for sym in "$@"; do
+              if grep -qE "^$sym=y" .config; then
+                echo "  [OK]   $sym"; return 0
+              fi
+            done
+            echo "  [MISS] $*"; MISSING=1
+          }
+          check CONFIG_TARGET_DEVICE_qualcommax_ipq807x_DEVICE_redmi_ax6 CONFIG_TARGET_qualcommax_ipq807x_DEVICE_redmi_ax6
+          check CONFIG_PACKAGE_kmod-qca-ssdk
+          check CONFIG_PACKAGE_kmod-qca-nss-dp
+          check CONFIG_PACKAGE_kmod-qca-nss-drv
+          check CONFIG_PACKAGE_kmod-qca-nss-ecm
+          check CONFIG_PACKAGE_nss-firmware-ipq807x
+          check CONFIG_NSS_MEM_PROFILE_MEDIUM
+          check CONFIG_NSS_DRV_WIFIOFFLOAD_ENABLE
+          check CONFIG_NSS_DRV_PPPOE_ENABLE
+          check CONFIG_PACKAGE_ath11k-firmware-ipq8074
+          check CONFIG_PACKAGE_kmod-ath11k-pci
+          if [ "$MISSING" -ne 0 ]; then
+            echo "===== 有配置项未生效，中止编译 ====="
+            exit 1
+          fi
+          echo "===== 全部关键配置已生效 ====="
 
       - name: 下载依赖包
         run: |
