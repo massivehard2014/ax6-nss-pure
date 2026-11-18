@@ -1,0 +1,110 @@
+name: Build LibWrt NSS Pure - Redmi AX6
+
+# 手动触发：Actions → 左侧 "Build LibWrt NSS Pure - Redmi AX6" → Run workflow
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # 你指定的项目与分支（LibWrt 目前只有 25.12-nss 这一个分支，主打 IPQ807X 满血 NSS）
+  REPO_URL: https://github.com/LiBwrt/LibWrt.git
+  REPO_BRANCH: 25.12-nss
+  # 纯净版配置：仅 NSS + WiFi + LuCI 中文，无任何第三方代理插件
+  CONFIG_FILE: configs/redmi-ax6-pure.config
+  TARGET_DIR: qualcommax/ipq807x
+  FIRMWARE_TAG: AX6-NSS-PURE
+  TZ: Asia/Shanghai
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout 配置文件
+        uses: actions/checkout@v4
+
+      - name: 初始化编译环境
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d /usr/local/lib/android
+          sudo -E apt-get -y update
+          sudo -E apt-get -y install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+          bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib \
+          git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev \
+          libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libreadline-dev libfuse-dev libssl-dev libtool lrzsz \
+          genisoimage msmtp nano ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip libpython3-dev qemu-utils \
+          rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
+          sudo timedatectl set-timezone "$TZ"
+
+      - name: 扩展磁盘空间
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 2048
+          swap-size-mb: 2048
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+
+      - name: 克隆 LibWrt 源码
+        run: |
+          git clone --depth 1 -b "$REPO_BRANCH" "$REPO_URL" openwrt
+          echo "OPENWRT_PATH=$GITHUB_WORKSPACE/openwrt" >> "$GITHUB_ENV"
+
+      - name: 载入纯净版配置并生成 .config
+        run: |
+          cp "$CONFIG_FILE" "$OPENWRT_PATH/.config"
+          [ -d files ] && cp -a files "$OPENWRT_PATH/"
+          cd "$OPENWRT_PATH"
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          make defconfig
+          echo "===== 核对关键配置（缺行则说明配置未生效）====="
+          grep -E 'CONFIG_TARGET_DEVICE_qualcommax_ipq807x_DEVICE_redmi_ax6|CONFIG_PACKAGE_nss-firmware-ipq8074|CONFIG_PACKAGE_ath11k-firmware-ipq8074|CONFIG_PACKAGE_kmod-qca-nss-drv-eogremgr' .config
+
+      - name: 下载依赖包
+        run: |
+          cd "$OPENWRT_PATH"
+          make download -j8
+          find dl -size -1024c -exec rm -f {} \;
+
+      - name: 编译固件
+        run: |
+          cd "$OPENWRT_PATH"
+          echo "使用 $(nproc) 线程编译"
+          make -j$(nproc) || make -j1 || make -j1 V=s
+
+      - name: 整理固件
+        run: |
+          cd "$OPENWRT_PATH/bin/targets/$TARGET_DIR"
+          echo "===== sha256sums ====="
+          cat sha256sums
+          mkdir -p "$GITHUB_WORKSPACE/firmware"
+          cp *redmi_ax6* "$GITHUB_WORKSPACE/firmware/"
+          cp sha256sums "$GITHUB_WORKSPACE/firmware/"
+          echo "===== 产物列表 ====="
+          ls -lh "$GITHUB_WORKSPACE/firmware"
+
+      - name: 上传固件到 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AX6-NSS-PURE
+          path: firmware/*
+          if-no-files-found: error
+
+      - name: 发布固件到 Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ env.FIRMWARE_TAG }}
+          name: Redmi AX6 · NSS 纯净版
+          allowUpdates: true
+          artifacts: firmware/*
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body: |
+            **源码**：${{ env.REPO_URL }} 分支 `${{ env.REPO_BRANCH }}`
+            **配置**：纯净版 —— 仅 NSS 全套驱动 + WiFi + LuCI 中文，无第三方代理/科学上网插件
+            **引导**：首次刷机请先看仓库 README 的刷机说明；刷机有风险，务必先备份。
+            固件默认地址 192.168.1.1，默认密码 none（LibWrt 默认）。
