@@ -40,7 +40,11 @@ README.md
 - 仓库 **Releases**：Tag `AX6-NSS-PURE`（含 sha256sums，推荐）
 - 该次 Actions 运行页底部的 **Artifacts**：`AX6-NSS-PURE`
 
-产物文件名形如 `openwrt-qualcommax-ipq807x-redmi_ax6-*.bin / .ubi`。
+产物文件名形如 `openwrt-qualcommax-ipq807x-redmi_ax6-stock-squashfs-sysupgrade.bin`。
+
+> 注：本配置针对 **custom U-Boot layout**（已刷第三方 U-Boot）编译 `redmi_ax6-stock` 变体。
+> 该变体只产出 sysupgrade 固件，**不再生成 `initramfs-factory.ubi`**，因为你的设备已有可用 U-Boot，
+> 不需要走"原厂 ubiformat 过渡"那条路。
 
 ### 4. 校验
 
@@ -52,16 +56,17 @@ certutil -hashfile .\固件文件名.bin SHA256
 
 ## 刷机提醒（重要）
 
-红米 AX6 刷第三方固件**必须先拿到原厂 SSH**（原厂固件没有直接开 SSH 的入口，
-常见做法是降级到指定版本后利用漏洞开启，具体以当前 OpenWrt 设备页为准：
-https://openwrt.org/inbox/toh/xiaomi/xiaomi_redmi_ax6_ax3000 ）。
+你的 AX6 是 **custom U-Boot layout**，所以刷法与原厂布局不同：
 
-- 官方分区：AX6 原厂 rootfs 分区约 35MB，纯净版固件体积足够小，可直接按标准流程 sysupgrade。
-- 大分区 / U-Boot 方案：如果你刷过第三方 U-Boot 做合并分区，请用与之匹配的固件，别混刷。
-- 首次刷入通常需要 `ubiformat` 写 `initramfs-factory.ubi` 到备用 rootfs 分区，再 `nvram set flag_boot_rootfs` 切换并从临时系统 sysupgrade 正式固件。**操作前务必备份原厂分区，刷机有变砖风险。**
-- 已知小坑：官方 wiki 提到 sysupgrade 偶尔因 wpad 未停导致失败，升级前先 `service wpad stop`。
+- **不需要也不能**走原厂那套"降级 → 开 SSH → `ubiformat` 写 initramfs → `nvram set flag_boot_rootfs`"流程。
+  那套是给纯原厂固件设备用的，你的分区表已经被第三方 U-Boot 改过，套用会出错。
+- 正确做法：进入你现有的 U-Boot 恢复界面（或当前 OpenWrt 的 `sysupgrade`），
+  直接刷 `openwrt-qualcommax-ipq807x-redmi_ax6-stock-squashfs-sysupgrade.bin`。
+- 刷机前确认你的 U-Boot 支持的分区布局与本固件匹配（第三方 U-Boot 有多种版本，分区大小可能不同）。
+  **不确定就先备份当前固件和 U-Boot 环境变量，刷机有变砖风险。**
+- 已知小坑：sysupgrade 偶尔因 wpad 未停导致失败，升级前先在 SSH 里执行 `service wpad stop`。
 
-刷机涉及硬件风险，本文只给编译方案；具体刷机命令请以设备页和你的分区现状为准。
+刷机涉及硬件风险，本文只给编译方案；具体刷机命令请以你的 U-Boot 文档为准。
 
 ## 关于 NSS
 

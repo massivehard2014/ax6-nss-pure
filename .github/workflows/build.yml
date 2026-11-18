@@ -72,7 +72,7 @@ jobs:
             done
             echo "  [MISS] $*"; MISSING=1
           }
-          check CONFIG_TARGET_DEVICE_qualcommax_ipq807x_DEVICE_redmi_ax6 CONFIG_TARGET_qualcommax_ipq807x_DEVICE_redmi_ax6
+          check CONFIG_TARGET_DEVICE_qualcommax_ipq807x_DEVICE_redmi_ax6-stock CONFIG_TARGET_qualcommax_ipq807x_DEVICE_redmi_ax6-stock
           check CONFIG_PACKAGE_kmod-qca-ssdk
           check CONFIG_PACKAGE_kmod-qca-nss-dp
           check CONFIG_PACKAGE_kmod-qca-nss-drv
@@ -107,7 +107,7 @@ jobs:
           echo "===== sha256sums ====="
           cat sha256sums
           mkdir -p "$GITHUB_WORKSPACE/firmware"
-          cp *redmi_ax6* "$GITHUB_WORKSPACE/firmware/"
+          cp *redmi_ax6-stock* "$GITHUB_WORKSPACE/firmware/"
           cp sha256sums "$GITHUB_WORKSPACE/firmware/"
           echo "===== 产物列表 ====="
           ls -lh "$GITHUB_WORKSPACE/firmware"
