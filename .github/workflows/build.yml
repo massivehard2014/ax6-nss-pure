@@ -68,6 +68,19 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
           make defconfig
+          # ---- 强制锁定 512MB 内存 profile ----
+          # 这里是 Kconfig choice，ipq807x 默认 HIGH(1G)，仅 unset 有时仍被默认值覆盖，
+          # 因此 defconfig 后若仍是 HIGH，直接改 .config 再 defconfig 一次。
+          if ! grep -qE '^CONFIG_NSS_MEM_PROFILE_MEDIUM=y' .config; then
+            echo "检测到内存 profile 非 MEDIUM，强制修正..."
+            sed -i 's/^CONFIG_NSS_MEM_PROFILE_HIGH=y/# CONFIG_NSS_MEM_PROFILE_HIGH is not set/' .config
+            sed -i '/^# CONFIG_NSS_MEM_PROFILE_MEDIUM is not set/d' .config
+            sed -i '/^CONFIG_NSS_MEM_PROFILE_MEDIUM=y/d' .config
+            echo 'CONFIG_NSS_MEM_PROFILE_MEDIUM=y' >> .config
+            make defconfig
+          fi
+          echo "当前 profile:"
+          grep -E '^CONFIG_NSS_MEM_PROFILE_(HIGH|MEDIUM|LOW)' .config || echo "(无匹配)"
           echo "===== 校验关键配置（任一缺失立即失败，避免白跑）====="
           MISSING=0
           check() {
