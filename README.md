@@ -1,18 +1,19 @@
 # Redmi AX6 · LibWrt NSS 纯净版云端编译
 
 给红米 AX6（IPQ8071A / IPQ807X）编译一套**满血 NSS 硬件加速 + 无第三方插件**的 OpenWrt 系统。
-源码使用你指定的 `https://github.com/LiBwrt/LibWrt`，分支 `25.12-nss`（该仓库当前唯一分支，专为 IPQ807X/IPQ60XX 做满血 NSS）。
 
-## 为什么用这套配置，而不是直接 fork 现成云编译模板
+源码：`https://github.com/LiBwrt/LibWrt`，分支 `25.12-nss`（该仓库当前唯一分支，专为 IPQ807X / IPQ60XX 做满血 NSS）。
+
+## 设计取舍
 
 LibWrt 官方 README 推荐了 4 个云编译项目（breeze303/openwrt-ci、ZqinKing/wrt_release、
-laipeng668/openwrt-ci-roc、VIKINGYFY/OpenWRT-CI）。但实测有两个不符合你的需求：
+laipeng668/openwrt-ci-roc、VIKINGYFY/OpenWRT-CI），但存在两个问题：
 
-1. **源码不一致**：这些模板大多 clone 的是老仓库 `LiBwrt/openwrt-6.x` 的 `main` 分支，
-   不是你指定的 `LiBwrt/LibWrt` 的 `25.12-nss` 分支。
-2. **并不纯净**：它们的 config 默认塞满了 passwall / sing-box / xray / ddns-go 等插件。
+1. **源码不一致**：这些模板大多 clone 老仓库 `LiBwrt/openwrt-6.x` 的 `main` 分支，
+   不是 `LiBwrt/LibWrt` 的 `25.12-nss` 分支。
+2. **并不纯净**：默认配置塞满了 passwall / sing-box / xray / ddns-go 等插件。
 
-本仓库的 `.github/workflows/build.yml` 直接 clone 你指定的仓库和分支，配 `configs/redmi-ax6-pure.config`，
+本仓库的 `.github/workflows/build.yml` 直接 clone 上述仓库与分支，配 `configs/redmi-ax6-pure.config`，
 只保留：系统基础 + WiFi(ath11k) + NSS 全套驱动/固件 + LuCI 中文。**不含任何代理类插件**。
 
 ## 使用步骤
@@ -31,20 +32,31 @@ README.md
 
 ### 2. 触发编译
 
-进入仓库 **Actions** 标签 → 左侧选 `Build LibWrt NSS Pure - Redmi AX6` → **Run workflow**。
-首次约 1.5～3 小时（GitHub  runners 性能波动较大）。
+两种方式：
+
+- **手动**：进入仓库 **Actions** 标签 → 左侧选 `Build LibWrt NSS Pure - Redmi AX6` → **Run workflow**。
+- **定时**：每月 1 号北京时间 08:00 自动编译一次（workflow 中的 `schedule` 触发器）。
+
+首次编译约 1.5～3 小时，取决于 GitHub Actions runner 的性能。
 
 ### 3. 取固件
 
 两种方式都可用：
+
 - 仓库 **Releases**：Tag `AX6-NSS-PURE`（含 sha256sums，推荐）
-- 该次 Actions 运行页底部的 **Artifacts**：`AX6-NSS-PURE`
+- 对应 Actions 运行页底部的 **Artifacts**：`AX6-NSS-PURE`
 
-产物文件名形如 `openwrt-qualcommax-ipq807x-redmi_ax6-stock-squashfs-sysupgrade.bin`。
+Release 中包含以下产物（以 `redmi_ax6-stock` 变体为例）：
 
-> 注：本配置针对 **custom U-Boot layout**（已刷第三方 U-Boot）编译 `redmi_ax6-stock` 变体。
-> 该变体只产出 sysupgrade 固件，**不再生成 `initramfs-factory.ubi`**，因为你的设备已有可用 U-Boot，
-> 不需要走"原厂 ubiformat 过渡"那条路。
+| 文件 | 用途 |
+|---|---|
+| `...-redmi_ax6-stock-squashfs-sysupgrade.bin` | 已在 OpenWrt / 第三方 U-Boot 环境下直接 sysupgrade |
+| `...-redmi_ax6-stock-squashfs-factory.ubi` | 第三方 U-Boot 界面刷入的 factory 固件 |
+| `...-redmi_ax6-stock-initramfs-uImage.itb` | 临时系统镜像 |
+
+> 本配置针对 **custom U-Boot layout**（已刷第三方 U-Boot、分区合并为大分区）编译 `redmi_ax6-stock`
+> 变体。该变体产出 `sysupgrade.bin` 和 `factory.ubi`，不产出 `initramfs-factory.ubi`
+> （面向已有可用 U-Boot 的设备，无需走原厂 ubiformat 过渡流程）。
 
 ### 4. 校验
 
@@ -54,34 +66,29 @@ README.md
 certutil -hashfile .\固件文件名.bin SHA256
 ```
 
-## 刷机提醒（重要）
+## 刷机须知（重要）
 
-你的 AX6 是 **custom U-Boot layout**，所以刷法与原厂布局不同：
-
-- **不需要也不能**走原厂那套"降级 → 开 SSH → `ubiformat` 写 initramfs → `nvram set flag_boot_rootfs`"流程。
-  那套是给纯原厂固件设备用的，你的分区表已经被第三方 U-Boot 改过，套用会出错。
-- 正确做法：进入你现有的 U-Boot 恢复界面（或当前 OpenWrt 的 `sysupgrade`），
-  直接刷 `openwrt-qualcommax-ipq807x-redmi_ax6-stock-squashfs-sysupgrade.bin`。
-- 刷机前确认你的 U-Boot 支持的分区布局与本固件匹配（第三方 U-Boot 有多种版本，分区大小可能不同）。
-  **不确定就先备份当前固件和 U-Boot 环境变量，刷机有变砖风险。**
-- 已知小坑：sysupgrade 偶尔因 wpad 未停导致失败，升级前先在 SSH 里执行 `service wpad stop`。
-
-刷机涉及硬件风险，本文只给编译方案；具体刷机命令请以你的 U-Boot 文档为准。
+- 本固件是 `redmi_ax6-stock` 变体，适配 **custom U-Boot layout**（第三方 U-Boot + 合并大分区）。
+- **完全原厂未刷机的 AX6 不能直接刷本固件**：原厂是双 35M 小分区布局，必须先开 SSH、刷过渡固件、
+  更换大分区 U-Boot 完成分区扩容。跨布局刷写会导致变砖。
+- 更换 U-Boot / 扩容分区前**务必先备份原厂分区**，尤其是 `ART`（无线校准数据，每台设备唯一，
+  丢失后 WiFi 无法恢复）和 U-Boot 本身。
+- 刷机有变砖风险，请自行评估并准备好救砖手段。
+- **详细刷机流程参考**：https://www.right.com.cn/forum/thread-8426229-1-1.html
 
 ## 关于 NSS
 
-- 本配置保留了 IPQ807X 的 NSS 驱动（`kmod-qca-nss-*`）与固件（`nss-firmware-ipq8074`），
+- 本配置保留了 IPQ807X 的 NSS 驱动（`kmod-qca-nss-*`）与固件（`nss-firmware-ipq807x`），
   2.4G / 5G WiFi offload、PPPoE、桥接、VLAN 等均走 NSS 加速。
-- **不要再在防火墙里勾选硬件/软件卸载加速**，会和 NSS 冲突。
-- 验证：跑大流量时 CPU 占用很低，或 `lsmod | grep qca_nss` 看驱动已加载。
+- 不要在防火墙里勾选硬件/软件卸载加速，会和 NSS 冲突。
+- 验证方法：跑大流量时 CPU 占用很低，或 `lsmod | grep qca_nss` 确认驱动已加载。
 
 ## 想加插件怎么办
 
-编辑 `configs/redmi-ax6-pure.config`，按 OpenWrt 的 `CONFIG_PACKAGE_xxx=y` 规则加上你要的包，
-再重新 Run workflow 即可。例如要装 passwall，把文件末尾对应的 `# CONFIG_PACKAGE_luci-app-passwall is not set`
-改成 `CONFIG_PACKAGE_luci-app-passwall=y`。但那就不是纯净版了。
+编辑 `configs/redmi-ax6-pure.config`，按 OpenWrt 的 `CONFIG_PACKAGE_xxx=y` 规则加上需要的包，
+再重新 Run workflow 即可。例如把文件末尾的 `# CONFIG_PACKAGE_luci-app-passwall is not set`
+改成 `CONFIG_PACKAGE_luci-app-passwall=y`。加入插件后不再是纯净版。
 
 ## 想改默认 IP / 加自定义文件
 
-在仓库根目录建 `files/etc/config/network` 覆盖默认配置即可；workflow 已预留把 `files/` 拷进源码的逻辑
-（如需请自行在 "载入纯净版配置" 步骤加一行 `[ -d files ] && cp -a files $OPENWRT_PATH/`）。
+在仓库根目录建 `files/etc/config/network` 覆盖默认配置即可；workflow 已预留把 `files/` 拷进源码的逻辑。
