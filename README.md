@@ -32,12 +32,8 @@ README.md
 
 ### 2. 触发编译
 
-两种方式：
-
-- **手动**：进入仓库 **Actions** 标签 → 左侧选 `Build LibWrt NSS Pure - Redmi AX6` → **Run workflow**。
-- **定时**：每月 1 号北京时间 08:00 自动编译一次（workflow 中的 `schedule` 触发器）。
-
-首次编译约 1.5～3 小时，取决于 GitHub Actions runner 的性能。
+进入仓库 **Actions** 标签 → 左侧选 `Build LibWrt NSS Pure - Redmi AX6` → **Run workflow**。
+按需手动触发，未配置定时任务。首次编译约 1.5～3 小时，取决于 GitHub Actions runner 的性能。
 
 ### 3. 取固件
 

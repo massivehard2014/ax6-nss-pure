@@ -1,12 +1,8 @@
 name: Build LibWrt NSS Pure - Redmi AX6
 
-# 触发方式：
-#   1. 手动：Actions → 左侧 "Build LibWrt NSS Pure - Redmi AX6" → Run workflow
-#   2. 定时：每月 1 号北京时间 08:00 自动编译一次（cron 用 UTC，即 1 号 00:00）
+# 手动触发：Actions → 左侧 "Build LibWrt NSS Pure - Redmi AX6" → Run workflow
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 0 1 * *'
 
 permissions:
   contents: write
